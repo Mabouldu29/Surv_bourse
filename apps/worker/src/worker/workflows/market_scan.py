@@ -18,6 +18,11 @@ DEFAULT_STOCKS = [
 ]
 DEFAULT_CRYPTOS = ["BTC-USD", "ETH-USD"]
 
+CRYPTO_NAMES = {
+    "BTC-USD": "Bitcoin",
+    "ETH-USD": "Ethereum",
+}
+
 
 class ScanInput(BaseModel):
     recipient_email: str = "quemenerm1@gmail.com"
@@ -30,6 +35,7 @@ class ScanInput(BaseModel):
 class AssetReport(BaseModel):
     symbol: str
     asset_type: str
+    name: str | None = None
     price: float | None = None
     sma_200w: float | None = None
     below_sma_200w: bool = False
@@ -105,6 +111,7 @@ def evaluate_buffett_stock(info: dict) -> tuple[int, list[str]]:
 
 def build_stock_report(symbol: str, history_closes: list[float], info: dict) -> AssetReport:
     report = AssetReport(symbol=symbol, asset_type="stock")
+    report.name = info.get("longName") or info.get("shortName") or symbol
     report.price = history_closes[-1] if history_closes else None
     report.sma_200w = compute_sma(history_closes)
     if report.price is not None and report.sma_200w is not None:
@@ -124,8 +131,10 @@ def build_stock_report(symbol: str, history_closes: list[float], info: dict) -> 
     return report
 
 
-def build_crypto_report(symbol: str, history_closes: list[float]) -> AssetReport:
+def build_crypto_report(symbol: str, history_closes: list[float], info: dict | None = None) -> AssetReport:
     report = AssetReport(symbol=symbol, asset_type="crypto")
+    info = info or {}
+    report.name = info.get("longName") or CRYPTO_NAMES.get(symbol) or symbol
     report.price = history_closes[-1] if history_closes else None
     report.sma_200w = compute_sma(history_closes)
     if report.price is not None and report.sma_200w is not None:
@@ -162,6 +171,7 @@ def is_opportunity(report: AssetReport, min_buffett_score: int) -> bool:
 def build_email_html(alerts: list[AssetReport]) -> str:
     rows = []
     for a in alerts:
+        label = f"{a.name} ({a.symbol})" if a.name else a.symbol
         gap = f"-{a.gap_to_sma_pct:.1f}%" if a.gap_to_sma_pct is not None else "n/a"
         drawdown = f"{a.drawdown_from_ath_pct:.0f}%" if a.drawdown_from_ath_pct is not None else "n/a"
         reasons = "<br>".join(a.reasons) if a.reasons else "-"
@@ -169,7 +179,7 @@ def build_email_html(alerts: list[AssetReport]) -> str:
         sma = f"{a.sma_200w:,.2f}" if a.sma_200w is not None else "n/a"
         rows.append(
             "<tr>"
-            f"<td><b>{a.symbol}</b> ({a.asset_type})</td>"
+            f"<td><b>{label}</b> ({a.asset_type})</td>"
             f"<td>{price}</td><td>{sma}</td><td>{gap}</td><td>{drawdown}</td>"
             f"<td>{a.buffett_score}/5</td><td>{reasons}</td>"
             "</tr>"
@@ -219,9 +229,12 @@ async def fetch_crypto_report(symbol: str) -> AssetReport:
         ticker = yf.Ticker(symbol)
         history = ticker.history(period="10y", interval="1wk")
         closes = [float(c) for c in history["Close"].dropna().tolist()]
-        if not closes:
-            return AssetReport(symbol=symbol, asset_type="crypto", error="Aucune donnee de cours")
-        return build_crypto_report(symbol, closes)
+        info = {}
+        try:
+            info = ticker.info or {}
+        except Exception:
+            info = {}
+        return build_crypto_report(symbol, closes, info)
 
     return await asyncio.to_thread(_fetch)
 

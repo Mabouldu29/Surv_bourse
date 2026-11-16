@@ -74,6 +74,21 @@ def test_build_stock_report_below_sma():
     assert is_opportunity(report, 3) is True
 
 
+def test_build_stock_report_uses_full_name():
+    closes = [200.0] * 250 + [100.0]
+    info = {"longName": "UnitedHealth Group"}
+    report = build_stock_report("UNH", closes, info)
+    assert report.name == "UnitedHealth Group"
+
+
+def test_build_crypto_report_full_name():
+    closes = [100.0] * 150 + [50.0] * 120 + [30.0]
+    report = build_crypto_report("BTC-USD", closes)
+    assert report.name == "Bitcoin"
+    html = build_email_html([report])
+    assert "Bitcoin (BTC-USD)" in html
+
+
 def test_build_stock_report_above_sma_not_opportunity():
     closes = [100.0] * 200 + [300.0]
     info = {"returnOnEquity": 0.18}
