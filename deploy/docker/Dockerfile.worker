@@ -1,0 +1,13 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+
+COPY apps/worker/pyproject.toml apps/worker/uv.lock ./
+COPY apps/worker/src ./src
+COPY apps/worker/tests ./tests
+
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+
+RUN uv sync --no-dev
+
+CMD ["/app/.venv/bin/python", "-m", "worker.entrypoints.worker"]
