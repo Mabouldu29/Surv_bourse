@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /app
 
-COPY apps/worker/pyproject.toml apps/worker/uv.lock ./
+COPY apps/worker/pyproject.toml ./
 COPY apps/worker/src ./src
 COPY apps/worker/tests ./tests
 
