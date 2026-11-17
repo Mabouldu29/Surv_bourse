@@ -8,7 +8,7 @@ Chaque jour, le workflow `market-buffett-scan` :
 2. Calcule la moyenne mobile de 200 semaines (MM200 sem.) et detecte les actifs dont le cours est en dessous.
 3. Applique les criteres facon Buffett :
    - **Actions** : ROE >= 15%, marge nette >= 10%, dette/fonds propres moderee, croissance des revenus >= 5%, PER raisonnable (<= 25). Un score 0-5 est calcule.
-   - **Cryptos** : cours sous la MM200 semaines (zone d'accumulation historique), drawdown eleve par rapport a l'ATH, tendance long terme (MM200 sem. ascendante).
+   - **Cryptos et ETF** : cours sous la MM200 semaines (zone d'accumulation historique), drawdown eleve par rapport a l'ATH, tendance long terme (MM200 sem. ascendante).
 4. Envoie un e-mail (via Resend) listant les actifs qui combinent un cours sous la MM200 semaines et des fondamentaux solides — c'est-a-dire des actifs qui ont "toutes les raisons de remonter".
 
 ## Liste des actifs
@@ -16,8 +16,9 @@ Chaque jour, le workflow `market-buffett-scan` :
 Par defaut : 12 grandes actions americaines (AAPL, MSFT, GOOGL, AMZN, BRK-B, JNJ, KO, PG, UNH, COST, WM, XOM),
 le CAC 40, les grandes valeurs du SBF 120 (ADP, Eurofins, Getlink, Rexel, Unibail, Klepierre, Fnac Darty, Ayvens, Soitec, Ubisoft),
 les principales blue chips europeennes eligibles au PEA (ASML, Adyen, Unilever, ING, Philips, Heineken, SAP, Siemens, Allianz, Bayer, BMW, Mercedes, Deutsche Telekom, Merck, Novo Nordisk, Intesa, Enel, ENI, Generali, Santander, Inditex, Iberdrola, Cellnex ; hors Suisse et Royaume-Uni, non eligibles au PEA),
-plus BTC-USD et ETH-USD.
-Modifiable dans l'input du workflow (`stocks`, `cryptos`) sans toucher au code.
+plus 11 cryptos (BTC, ETH, SOL, BNB, XRP, ADA, AVAX, DOGE, LINK, DOT, LTC)
+et 6 ETF eligibles au PEA (DCAM, WPEA, PUST, PSP5, ESE, PAEEM).
+Modifiable dans l'input du workflow (`stocks`, `cryptos`, `etfs`) sans toucher au code.
 
 ## Configuration
 

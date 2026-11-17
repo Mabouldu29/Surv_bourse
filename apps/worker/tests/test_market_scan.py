@@ -4,6 +4,7 @@ from worker.workflows.market_scan import (
     AssetReport,
     build_crypto_report,
     build_email_html,
+    build_etf_report,
     build_stock_report,
     compute_drawdown_pct,
     compute_sma,
@@ -104,6 +105,16 @@ def test_build_crypto_report_criteria():
     assert report.drawdown_from_ath_pct is not None and report.drawdown_from_ath_pct > 40
     assert report.buffett_score >= 2
     assert is_opportunity(report, 2) is True
+
+
+def test_build_etf_report_criteria():
+    closes = [100.0] * 250 + [70.0]
+    report = build_etf_report("DCAM.PA", closes, {"longName": "Amundi PEA Monde (MSCI World)"})
+    assert report.asset_type == "etf"
+    assert report.name == "Amundi PEA Monde (MSCI World)"
+    assert report.below_sma_200w is True
+    assert report.drawdown_from_ath_pct is not None and report.drawdown_from_ath_pct >= 20
+    assert report.buffett_score >= 2
 
 
 def test_is_opportunity_error_report():

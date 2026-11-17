@@ -89,7 +89,28 @@ DEFAULT_STOCKS = [
     "IBE.MC",
     "CLNX.MC",
 ]
-DEFAULT_CRYPTOS = ["BTC-USD", "ETH-USD"]
+DEFAULT_CRYPTOS = [
+    "BTC-USD",
+    "ETH-USD",
+    "SOL-USD",
+    "BNB-USD",
+    "XRP-USD",
+    "ADA-USD",
+    "AVAX-USD",
+    "DOGE-USD",
+    "LINK-USD",
+    "DOT-USD",
+    "LTC-USD",
+]
+
+DEFAULT_ETFS = [
+    "DCAM.PA",
+    "WPEA.PA",
+    "PUST.PA",
+    "PSP5.PA",
+    "ESE.PA",
+    "PAEEM.PA",
+]
 
 CRYPTO_NAMES = {
     "BTC-USD": "Bitcoin",
@@ -101,6 +122,7 @@ class ScanInput(BaseModel):
     recipient_email: str = "quemenerm1@gmail.com"
     stocks: list[str] = Field(default_factory=lambda: list(DEFAULT_STOCKS))
     cryptos: list[str] = Field(default_factory=lambda: list(DEFAULT_CRYPTOS))
+    etfs: list[str] = Field(default_factory=lambda: list(DEFAULT_ETFS))
     min_buffett_score: int = 3
     dry_run: bool = False
 
@@ -233,6 +255,35 @@ def build_crypto_report(symbol: str, history_closes: list[float], info: dict | N
     return report
 
 
+def build_etf_report(symbol: str, history_closes: list[float], info: dict | None = None) -> AssetReport:
+    report = AssetReport(symbol=symbol, asset_type="etf")
+    info = info or {}
+    report.name = info.get("longName") or info.get("shortName") or symbol
+    report.price = history_closes[-1] if history_closes else None
+    report.sma_200w = compute_sma(history_closes)
+    if report.price is not None and report.sma_200w is not None:
+        report.below_sma_200w = report.price < report.sma_200w
+        report.gap_to_sma_pct = (report.sma_200w - report.price) / report.sma_200w * 100
+    report.drawdown_from_ath_pct = compute_drawdown_pct(history_closes)
+    trend = sma_trend_positive(history_closes)
+    report.buffett_score = 0
+
+    if report.below_sma_200w:
+        report.reasons.append("Cours sous la moyenne mobile 200 semaines")
+        report.buffett_score += 1
+    if isinstance(report.drawdown_from_ath_pct, (int, float)) and report.drawdown_from_ath_pct >= 20:
+        report.reasons.append(f"Drawdown de {report.drawdown_from_ath_pct:.0f}% par rapport au plus haut historique")
+        report.buffett_score += 1
+    if trend is True:
+        report.reasons.append("Tendance long terme intacte (MM200 semaines ascendante)")
+        report.buffett_score += 1
+    elif trend is None:
+        report.reasons.append("Historique insuffisant pour juger la tendance long terme")
+
+    report.alerts = list(report.reasons)
+    return report
+
+
 def is_opportunity(report: AssetReport, min_buffett_score: int) -> bool:
     if report.error or not report.below_sma_200w:
         return False
@@ -312,6 +363,28 @@ async def fetch_crypto_report(symbol: str) -> AssetReport:
     return await asyncio.to_thread(_fetch)
 
 
+@workflows.activity(name="fetch-etf-report")
+async def fetch_etf_report(symbol: str) -> AssetReport:
+    import asyncio
+
+    import yfinance as yf
+
+    def _fetch() -> AssetReport:
+        ticker = yf.Ticker(symbol)
+        history = ticker.history(period="10y", interval="1wk")
+        closes = [float(c) for c in history["Close"].dropna().tolist()]
+        if not closes:
+            return AssetReport(symbol=symbol, asset_type="etf", error="Aucune donnee de cours")
+        info = {}
+        try:
+            info = ticker.info or {}
+        except Exception:
+            info = {}
+        return build_etf_report(symbol, closes, info)
+
+    return await asyncio.to_thread(_fetch)
+
+
 @workflows.activity(name="send-alert-email")
 async def send_alert_email(recipient_email: str, subject: str, html: str) -> bool:
     import os
@@ -353,6 +426,8 @@ class MarketBuffettScanWorkflow:
             reports.append(await fetch_stock_report(symbol))
         for symbol in input.cryptos:
             reports.append(await fetch_crypto_report(symbol))
+        for symbol in input.etfs:
+            reports.append(await fetch_etf_report(symbol))
 
         alerts = [
             r
