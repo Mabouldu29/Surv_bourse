@@ -140,6 +140,7 @@ class AssetReport(BaseModel):
     buffett_score: int = 0
     reasons: list[str] = Field(default_factory=list)
     alerts: list[str] = Field(default_factory=list)
+    commentary: str | None = None
     error: str | None = None
 
 
@@ -308,6 +309,8 @@ def build_email_html(alerts: list[AssetReport]) -> str:
         )
         drawdown = f"{a.drawdown_from_ath_pct:.0f}%" if a.drawdown_from_ath_pct is not None else "n/a"
         reasons = "<br>".join(a.reasons) if a.reasons else "-"
+        if a.commentary:
+            reasons += "<br><br><b>Analyse :</b><br>" + a.commentary.replace("\n", "<br>")
         price = f"{a.price:,.2f}" if a.price is not None else "n/a"
         sma = f"{a.sma_200w:,.2f}" if a.sma_200w is not None else "n/a"
         if a.sma_200w is not None and a.sma_period_weeks != 200:
@@ -396,6 +399,38 @@ async def fetch_etf_report(symbol: str) -> AssetReport:
     return await asyncio.to_thread(_fetch)
 
 
+@workflows.activity(name="generate-commentary")
+async def generate_commentary(symbol: str, name: str, asset_type: str, context: dict) -> str | None:
+    import os
+
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        return None
+
+    from mistralai import Mistral
+
+    client = Mistral(api_key=api_key)
+    context_lines = "\n".join(f"- {k}: {v}" for k, v in context.items())
+    prompt = (
+        f"Actif: {name} ({symbol}), type: {asset_type}.\n\n"
+        f"Donnees recentes:\n{context_lines}\n\n"
+        "Redige en francais, tres concis (maximum 120 mots au total), deux courts paragraphes sans titre:\n"
+ "1) une phrase sur la ou les raison(s) probable(s) de la baisse recente de cet actif; "
+ "2) une a deux phrases sur les elements concrets qui pourraient faire remonter le cours "
+ "(catalyseurs, fondamentaux, contexte de marche), en precisant que ce sont des hypotheses si necessaire. "
+ "Pas de liste a puces, pas de conseil en investissement."
+    )
+    response = await client.chat.complete_async(
+        model="mistral-small-latest",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=250,
+    )
+    if response and response.choices:
+        return response.choices[0].message.content
+    return None
+
+
 @workflows.activity(name="send-alert-email")
 async def send_alert_email(recipient_email: str, subject: str, html: str) -> bool:
     import os
@@ -450,6 +485,18 @@ class MarketBuffettScanWorkflow:
             alerts=alerts,
             dry_run=input.dry_run,
         )
+        for r in alerts:
+            context = {
+                "Cours actuel": round(r.price, 2) if r.price is not None else "n/a",
+                "Moyenne mobile 200 semaines": round(r.sma_200w, 2) if r.sma_200w is not None else "n/a",
+                "Ecart a la moyenne mobile (%)": round(r.gap_to_sma_pct, 1) if r.gap_to_sma_pct is not None else "n/a",
+                "Drawdown vs plus haut historique (%)": round(r.drawdown_from_ath_pct, 1)
+                if r.drawdown_from_ath_pct is not None
+                else "n/a",
+                "Criteres remplis": "; ".join(r.reasons) if r.reasons else "aucun",
+            }
+            r.commentary = await generate_commentary(r.symbol, r.name or r.symbol, r.asset_type, context)
+
         if alerts and not input.dry_run:
             subject = f"[Surveillance Marches] {len(alerts)} opportunite(s) sous la MM200 semaines"
             html = build_email_html(alerts)

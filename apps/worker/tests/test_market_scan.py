@@ -139,3 +139,13 @@ def test_build_email_html_contains_alerts():
     html = build_email_html([report])
     assert "TEST" in html
     assert "MM200" in html
+
+
+def test_build_email_html_with_commentary():
+    closes = [200.0] * 250 + [100.0]
+    info = {"returnOnEquity": 0.18}
+    report = build_stock_report("TEST", closes, info)
+    report.commentary = "Raison de la baisse: secteur sous pression.\nCatalyseurs: redemarrage de la demande."
+    html = build_email_html([report])
+    assert "<b>Analyse :</b>" in html
+    assert "Catalyseurs" in html
