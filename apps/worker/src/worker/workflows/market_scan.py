@@ -117,6 +117,14 @@ CRYPTO_NAMES = {
     "ETH-USD": "Ethereum",
 }
 
+ANALYST_LABELS = {
+    "strong_buy": "Achat fort",
+    "buy": "Achat",
+    "hold": "Conserver",
+    "underperform": "Sous-performance",
+    "sell": "Vendre",
+}
+
 
 class ScanInput(BaseModel):
     recipient_email: str = "quemenerm1@gmail.com"
@@ -141,6 +149,10 @@ class AssetReport(BaseModel):
     reasons: list[str] = Field(default_factory=list)
     alerts: list[str] = Field(default_factory=list)
     commentary: str | None = None
+    analyst_rating: str | None = None
+    analyst_target: float | None = None
+    analyst_count: int | None = None
+    analyst_upside_pct: float | None = None
     error: str | None = None
 
 
@@ -216,6 +228,17 @@ def build_stock_report(symbol: str, history_closes: list[float], info: dict) -> 
         report.gap_to_sma_pct = (report.sma_200w - report.price) / report.sma_200w * 100
     report.drawdown_from_ath_pct = compute_drawdown_pct(history_closes)
     report.buffett_score, report.reasons = evaluate_buffett_stock(info)
+
+    rating_key = info.get("recommendationKey")
+    if rating_key:
+        report.analyst_rating = ANALYST_LABELS.get(str(rating_key), str(rating_key).replace("_", " "))
+    target = info.get("targetMeanPrice")
+    if isinstance(target, (int, float)) and target > 0 and report.price:
+        report.analyst_target = float(target)
+        report.analyst_upside_pct = (target - report.price) / report.price * 100
+    count = info.get("numberOfAnalystOpinions")
+    if isinstance(count, (int, float)) and count > 0:
+        report.analyst_count = int(count)
 
     if report.below_sma_200w:
         report.alerts.append("Cours sous la moyenne mobile 200 semaines")
@@ -311,6 +334,13 @@ def build_email_html(alerts: list[AssetReport]) -> str:
         reasons = "<br>".join(a.reasons) if a.reasons else "-"
         if a.commentary:
             reasons += "<br><br><b>Analyse :</b><br>" + a.commentary.replace("\n", "<br>")
+        analyst = "n/a"
+        if a.analyst_rating:
+            analyst = a.analyst_rating
+            if a.analyst_count:
+                analyst += f" ({a.analyst_count} analysts)"
+            if a.analyst_target and a.analyst_upside_pct is not None:
+                analyst += f"<br>obj. {a.analyst_target:,.2f} ({a.analyst_upside_pct:+.0f}%)"
         price = f"{a.price:,.2f}" if a.price is not None else "n/a"
         sma = f"{a.sma_200w:,.2f}" if a.sma_200w is not None else "n/a"
         if a.sma_200w is not None and a.sma_period_weeks != 200:
@@ -319,7 +349,7 @@ def build_email_html(alerts: list[AssetReport]) -> str:
             "<tr>"
             f"<td><b>{label}</b> ({a.asset_type})</td>"
             f"<td>{price}</td><td>{sma}</td><td>{gap}</td><td>{drawdown}</td>"
-            f"<td>{a.buffett_score}/5</td><td>{reasons}</td>"
+            f"<td>{a.buffett_score}/5</td><td>{analyst}</td><td>{reasons}</td>"
             "</tr>"
         )
     return (
@@ -328,7 +358,7 @@ def build_email_html(alerts: list[AssetReport]) -> str:
         "les criteres de qualite facon Buffett. Ce sont des zones historiques d'achat.</p>"
         "<table border='1' cellpadding='6' cellspacing='0'>"
         "<tr><th>Actif</th><th>Cours</th><th>MM200 sem.</th><th>Ecart</th>"
-        "<th>Drawdown ATH</th><th>Score Buffett</th><th>Raisons</th></tr>"
+        "<th>Drawdown ATH</th><th>Score Buffett</th><th>Analystes</th><th>Raisons</th></tr>"
         + "".join(rows)
         + "</table>"
         "<p style='color:gray'>Analyse automatique quotidienne. Ne constitue pas un conseil en investissement.</p>"

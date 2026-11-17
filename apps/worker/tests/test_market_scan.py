@@ -127,6 +127,24 @@ def test_build_etf_report_short_history_uses_max_period():
     assert "61 sem." in html
 
 
+def test_build_stock_report_analyst_data():
+    closes = [200.0] * 250 + [100.0]
+    info = {
+        "returnOnEquity": 0.18,
+        "recommendationKey": "buy",
+        "targetMeanPrice": 150.0,
+        "numberOfAnalystOpinions": 24,
+    }
+    report = build_stock_report("TEST", closes, info)
+    assert report.analyst_rating == "Achat"
+    assert report.analyst_target == 150.0
+    assert report.analyst_count == 24
+    assert report.analyst_upside_pct == 50.0
+    html = build_email_html([report])
+    assert "Analystes" in html
+    assert "obj. 150.00 (+50%)" in html
+
+
 def test_is_opportunity_error_report():
     report = AssetReport(symbol="X", asset_type="stock", error="no data")
     assert is_opportunity(report, 3) is False
