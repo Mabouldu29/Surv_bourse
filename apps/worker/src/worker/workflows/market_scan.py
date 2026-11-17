@@ -230,7 +230,7 @@ def build_stock_report(symbol: str, history_closes: list[float], info: dict) -> 
     report.buffett_score, report.reasons = evaluate_buffett_stock(info)
 
     rating_key = info.get("recommendationKey")
-    if rating_key:
+    if rating_key and str(rating_key).lower() not in ("", "none", "n/a"):
         report.analyst_rating = ANALYST_LABELS.get(str(rating_key), str(rating_key).replace("_", " "))
     target = info.get("targetMeanPrice")
     if isinstance(target, (int, float)) and target > 0 and report.price:
