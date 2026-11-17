@@ -414,9 +414,8 @@ async def generate_commentary(symbol: str, name: str, asset_type: str, context: 
     if not api_key:
         return None
 
-    from mistralai import Mistral
+    import httpx
 
-    client = Mistral(api_key=api_key)
     context_lines = "\n".join(f"- {k}: {v}" for k, v in context.items())
     prompt = (
         f"Actif: {name} ({symbol}), type: {asset_type}.\n\n"
@@ -427,14 +426,24 @@ async def generate_commentary(symbol: str, name: str, asset_type: str, context: 
  "(catalyseurs, fondamentaux, contexte de marche), en precisant que ce sont des hypotheses si necessaire. "
  "Pas de liste a puces, pas de conseil en investissement."
     )
-    response = await client.chat.complete_async(
-        model="mistral-small-latest",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=250,
-    )
-    if response and response.choices:
-        return response.choices[0].message.content
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": "mistral-small-latest",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 250,
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+    choices = data.get("choices") or []
+    if choices:
+        content = choices[0].get("message", {}).get("content")
+        if content:
+            return content
     return None
 
 
