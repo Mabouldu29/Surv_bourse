@@ -133,6 +133,7 @@ class AssetReport(BaseModel):
     name: str | None = None
     price: float | None = None
     sma_200w: float | None = None
+    sma_period_weeks: int = 200
     below_sma_200w: bool = False
     gap_to_sma_pct: float | None = None
     drawdown_from_ath_pct: float | None = None
@@ -260,7 +261,10 @@ def build_etf_report(symbol: str, history_closes: list[float], info: dict | None
     info = info or {}
     report.name = info.get("longName") or info.get("shortName") or symbol
     report.price = history_closes[-1] if history_closes else None
-    report.sma_200w = compute_sma(history_closes)
+    window = min(200, len(history_closes))
+    if window:
+        report.sma_200w = sum(history_closes[-window:]) / window
+        report.sma_period_weeks = window
     if report.price is not None and report.sma_200w is not None:
         report.below_sma_200w = report.price < report.sma_200w
         report.gap_to_sma_pct = (report.sma_200w - report.price) / report.sma_200w * 100
@@ -269,7 +273,10 @@ def build_etf_report(symbol: str, history_closes: list[float], info: dict | None
     report.buffett_score = 0
 
     if report.below_sma_200w:
-        report.reasons.append("Cours sous la moyenne mobile 200 semaines")
+        if window < 200:
+            report.reasons.append(f"Cours sous la moyenne mobile de {window} semaines (historique maximal disponible)")
+        else:
+            report.reasons.append("Cours sous la moyenne mobile 200 semaines")
         report.buffett_score += 1
     if isinstance(report.drawdown_from_ath_pct, (int, float)) and report.drawdown_from_ath_pct >= 20:
         report.reasons.append(f"Drawdown de {report.drawdown_from_ath_pct:.0f}% par rapport au plus haut historique")
@@ -301,6 +308,8 @@ def build_email_html(alerts: list[AssetReport]) -> str:
         reasons = "<br>".join(a.reasons) if a.reasons else "-"
         price = f"{a.price:,.2f}" if a.price is not None else "n/a"
         sma = f"{a.sma_200w:,.2f}" if a.sma_200w is not None else "n/a"
+        if a.sma_200w is not None and a.sma_period_weeks != 200:
+            sma += f" ({a.sma_period_weeks} sem.)"
         rows.append(
             "<tr>"
             f"<td><b>{label}</b> ({a.asset_type})</td>"

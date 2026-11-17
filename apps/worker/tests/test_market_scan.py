@@ -117,6 +117,16 @@ def test_build_etf_report_criteria():
     assert report.buffett_score >= 2
 
 
+def test_build_etf_report_short_history_uses_max_period():
+    closes = [10.0] * 40 + [5.0] * 20 + [4.0]
+    report = build_etf_report("DCAM.PA", closes)
+    assert report.sma_period_weeks == 61
+    assert report.sma_200w is not None and report.sma_200w < 10
+    assert report.below_sma_200w is True
+    html = build_email_html([report])
+    assert "61 sem." in html
+
+
 def test_is_opportunity_error_report():
     report = AssetReport(symbol="X", asset_type="stock", error="no data")
     assert is_opportunity(report, 3) is False
