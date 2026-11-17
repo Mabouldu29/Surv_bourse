@@ -13,7 +13,10 @@ Chaque jour, le workflow `market-buffett-scan` :
 
 ## Liste des actifs
 
-Par defaut : AAPL, MSFT, GOOGL, AMZN, BRK-B, JNJ, KO, PG, UNH, COST, WM, XOM, BTC-USD, ETH-USD.
+Par defaut : 12 grandes actions americaines (AAPL, MSFT, GOOGL, AMZN, BRK-B, JNJ, KO, PG, UNH, COST, WM, XOM),
+le CAC 40, les grandes valeurs du SBF 120 (ADP, Eurofins, Getlink, Rexel, Unibail, Klepierre, Fnac Darty, Ayvens, Soitec, Ubisoft),
+les principales blue chips europeennes eligibles au PEA (ASML, Adyen, Unilever, ING, Philips, Heineken, SAP, Siemens, Allianz, Bayer, BMW, Mercedes, Deutsche Telekom, Merck, Novo Nordisk, Intesa, Enel, ENI, Generali, Santander, Inditex, Iberdrola, Cellnex ; hors Suisse et Royaume-Uni, non eligibles au PEA),
+plus BTC-USD et ETH-USD.
 Modifiable dans l'input du workflow (`stocks`, `cryptos`) sans toucher au code.
 
 ## Configuration
