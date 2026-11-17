@@ -303,7 +303,9 @@ def build_email_html(alerts: list[AssetReport]) -> str:
     rows = []
     for a in alerts:
         label = f"{a.name} ({a.symbol})" if a.name else a.symbol
-        gap = f"-{a.gap_to_sma_pct:.1f}%" if a.gap_to_sma_pct is not None else "n/a"
+        gap = f"-{a.gap_to_sma_pct:.1f}%" if isinstance(a.gap_to_sma_pct, (int, float)) and a.gap_to_sma_pct >= 0 else (
+            f"+{-a.gap_to_sma_pct:.1f}%" if isinstance(a.gap_to_sma_pct, (int, float)) else "n/a"
+        )
         drawdown = f"{a.drawdown_from_ath_pct:.0f}%" if a.drawdown_from_ath_pct is not None else "n/a"
         reasons = "<br>".join(a.reasons) if a.reasons else "-"
         price = f"{a.price:,.2f}" if a.price is not None else "n/a"
