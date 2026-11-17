@@ -405,6 +405,13 @@ async def generate_commentary(symbol: str, name: str, asset_type: str, context: 
 
     api_key = os.environ.get("MISTRAL_API_KEY")
     if not api_key:
+        token_path = os.environ.get("MISTRAL_SA_TOKEN_PATH", "/var/run/cr/tokens/mistral")
+        try:
+            with open(token_path) as f:
+                api_key = f.read().strip()
+        except OSError:
+            api_key = None
+    if not api_key:
         return None
 
     from mistralai import Mistral
